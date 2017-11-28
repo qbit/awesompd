@@ -8,6 +8,7 @@ local wibox = require("wibox")
 local awful = require('awful')
 local beautiful = require('beautiful')
 local naughty = require('naughty')
+local gears = require('gears')
 local format = string.format
 
 local module_path = (...):match ("(.+/)[^/]+$") or ""
@@ -62,7 +63,7 @@ awesompd.ESCAPE_SYMBOL_MAPPING["&"] = "&amp;"
 awesompd.ESCAPE_MENU_SYMBOL_MAPPING = {}
 awesompd.ESCAPE_MENU_SYMBOL_MAPPING["&"] = "'n'"
 
--- /// Current track variables and functions /// 
+-- /// Current track variables and functions ///
 
 -- Returns a string for the given track to be displayed in the widget
 -- and notification.
@@ -89,7 +90,7 @@ end
 
 -- Returns true if the current status is either PLAYING or PAUSED
 function awesompd:playing_or_paused()
-   return self.status == awesompd.PLAYING 
+   return self.status == awesompd.PLAYING
       or self.status == awesompd.PAUSED
 end
 
@@ -131,7 +132,7 @@ function awesompd.split(s)
       return l
    end
    s = s .. "\n"
-   local f = function (s) 
+   local f = function (s)
                 l.n = l.n + 1
 		l[l.n] = s
 	     end
@@ -160,7 +161,7 @@ function awesompd.load_icons(path)
    awesompd.ICONS.PREV = awesompd.try_load(path .. "/prev_icon.png")
    awesompd.ICONS.CHECK = awesompd.try_load(path .. "/check_icon.png")
    awesompd.ICONS.RADIO = awesompd.try_load(path .. "/radio_icon.png")
-   awesompd.ICONS.DEFAULT_ALBUM_COVER = 
+   awesompd.ICONS.DEFAULT_ALBUM_COVER =
       awesompd.try_load(path .. "/default_album_cover.png")
 end
 
@@ -212,7 +213,7 @@ function awesompd:create()
 -- Smart Update (sets timer to check/update widget near when the current track should end)
    instance.track_position = "00:00"
    instance.track_duration = "00:00"
-   instance.smart_update_timer = timer({ timeout = instance.update_interval })
+   instance.smart_update_timer = gears.timer({ timeout = instance.update_interval })
    -- Widget configuration
    instance.widget:connect_signal("mouse::enter", function(c)
 	    instance:update_track()
@@ -233,12 +234,25 @@ function awesompd:run()
    end
 
    self.text_widget = wibox.widget.textbox()
+   self.view_widget = wibox.widget {
+      layout = wibox.container.scroll.horizontal,
+      max_size = 100,
+      step_function = wibox.container.scroll.step_functions
+                      .linear_increase,
+                      --.waiting_nonlinear_back_and_forth,
+      speed = 10,
+      {
+          widget = self.text_widget,
+          text = " - ",
+      },
+   }
    if self.widget_icon then
       self.icon_widget = wibox.widget.imagebox()
       self.icon_widget:set_image(self.widget_icon)
       self.widget:add(self.icon_widget)
    end
-   self.widget:add(self.text_widget)
+   --self.widget:add(self.text_widget)
+   self.widget:add(self.view_widget)
 
    self:update_track()
    self:check_playlists()
@@ -249,12 +263,12 @@ function awesompd:run()
       scheduler.register_recurring("awesompd_update", self.update_interval,
                                    function() self:update_track() end)
    else
-      self.update_widget_timer = timer({ timeout = 1 })
+      self.update_widget_timer = gears.timer({ timeout = 1 })
       self.update_widget_timer:connect_signal("timeout", function()
                                                  self:update_widget()
                                                          end)
       self.update_widget_timer:start()
-      self.update_track_timer = timer({ timeout = self.update_interval })
+      self.update_track_timer = gears.timer({ timeout = self.update_interval })
       self.update_track_timer:connect_signal("timeout", function()
                                                 self:update_track()
                                                         end)
@@ -272,11 +286,11 @@ function awesompd:register_buttons(buttons)
       else
          mods = buttons[b][1]
       end
-      if type(buttons[b][2]) == "number" then 
+      if type(buttons[b][2]) == "number" then
          -- This is a mousebinding, bind it to the widget
-         table.insert(widget_buttons, 
+         table.insert(widget_buttons,
                       awful.button(mods, buttons[b][2], buttons[b][3]))
-      else 
+      else
          -- This is a global keybinding, remember it for later usage in append_global_keys
          table.insert(self.global_bindings, awful.key(mods, buttons[b][2], buttons[b][3]))
       end
@@ -387,8 +401,8 @@ end
 
 function awesompd:command_load_playlist(name)
    return function()
-             self:command("load \"" .. name .. "\"", function() 
-                                              self.recreate_menu = true 
+             self:command("load \"" .. name .. "\"", function()
+                                              self.recreate_menu = true
                                            end)
           end
 end
@@ -454,25 +468,25 @@ end
 -- /// Menu generation functions ///
 
 function awesompd:command_show_menu()
-   return 
+   return
    function()
       self:hide_notification()
-      if self.recreate_menu then 
+      if self.recreate_menu then
          local new_menu = {}
-         if self.main_menu ~= nil then 
-            self.main_menu:hide() 
-         end 
+         if self.main_menu ~= nil then
+            self.main_menu:hide()
+         end
          if self.status ~= awesompd.DISCONNECTED
-         then 
-            self:check_list() 
+         then
+            self:check_list()
             self:check_playlists()
-            local jamendo_menu = { { "Search by", 
+            local jamendo_menu = { { "Search by",
                                      { { "Nothing (Top 100)", self:menu_jamendo_top() },
                                        { "Artist", self:menu_jamendo_search_by(jamendo.SEARCH_ARTIST) },
                                        { "Album", self:menu_jamendo_search_by(jamendo.SEARCH_ALBUM) },
                                        { "Tag", self:menu_jamendo_search_by(jamendo.SEARCH_TAG) }}} }
             local browse_menu = self:menu_jamendo_browse()
-            if browse_menu then 
+            if browse_menu then
                table.insert(jamendo_menu, browse_menu)
             end
             table.insert(jamendo_menu, self:menu_jamendo_format())
@@ -483,13 +497,13 @@ function awesompd:command_show_menu()
                          { "List", self:menu_list() },
                          { "Playlists", self:menu_playlists() },
                          { "Jamendo", jamendo_menu } }
-         end 
-         table.insert(new_menu, { "Servers", self:menu_servers() }) 
-         self.main_menu = awful.menu({ items = new_menu, theme = { width = 300 } }) 
-         self.recreate_menu = false 
-      end 
-      self.main_menu:toggle() 
-   end 
+         end
+         table.insert(new_menu, { "Servers", self:menu_servers() })
+         self.main_menu = awful.menu({ items = new_menu, theme = { width = 300 } })
+         self.recreate_menu = false
+      end
+      self.main_menu:toggle()
+   end
 end
 
 -- Returns an icon for a checkbox menu item if it is checked, nil
@@ -506,33 +520,33 @@ end
 
 -- Returns the playback menu. Menu contains of:
 -- Play\Pause - always
--- Previous - if the current track is not the first 
+-- Previous - if the current track is not the first
 -- in the list and playback is not stopped
--- Next - if the current track is not the last 
+-- Next - if the current track is not the last
 -- in the list and playback is not stopped
 -- Stop - if the playback is not stopped
 -- Clear playlist - always
 function awesompd:menu_playback()
    if self.recreate_playback then
       local new_menu = {}
-      table.insert(new_menu, { "Play\\Pause", 
-                               self:command_toggle(), 
+      table.insert(new_menu, { "Play\\Pause",
+                               self:command_toggle(),
                                self.ICONS.PLAY_PAUSE })
       if self:playing_or_paused() then
          if self.list_array and self.list_array[self.current_number-1] then
-            table.insert(new_menu, 
-                         { "Prev: " .. 
+            table.insert(new_menu,
+                         { "Prev: " ..
                            awesompd.protect_string(jamendo.replace_link(
                                                       self.list_array[self.current_number - 1]),
                                                    true),
                         self:command_prev_track(), self.ICONS.PREV })
          end
          if self.list_array and self.current_number ~= #self.list_array then
-            table.insert(new_menu, 
-                         { "Next: " .. 
+            table.insert(new_menu,
+                         { "Next: " ..
                            awesompd.protect_string(jamendo.replace_link(
-                                                      self.list_array[self.current_number + 1]), 
-                                                   true), 
+                                                      self.list_array[self.current_number + 1]),
+                                                   true),
                         self:command_next_track(), self.ICONS.NEXT })
          end
          table.insert(new_menu, { "Stop", self:command_stop(), self.ICONS.STOP })
@@ -550,13 +564,13 @@ function awesompd:menu_list()
    if self.recreate_list then
       local new_menu = {}
       if self.list_array then
-         local total_count = #self.list_array 
+         local total_count = #self.list_array
          local start_num = (self.current_number - 15 > 0) and self.current_number - 15 or 1
          local end_num = (self.current_number + 15 < total_count ) and self.current_number + 15 or total_count
          for i = start_num, end_num do
             table.insert(new_menu, { jamendo.replace_link(self.list_array[i]),
                                      self:command_play_specific(i),
-                                     self.current_number == i and 
+                                     self.current_number == i and
                                         (self.status == self.PLAYING and self.ICONS.PLAY or self.ICONS.PAUSE)
                                      or nil} )
          end
@@ -566,7 +580,7 @@ function awesompd:menu_list()
    end
    return self.list_menu
 end
-	     
+
 -- Returns the playlists menu. Menu consists of all files in the playlist folder.
 function awesompd:menu_playlists()
    if self.recreate_playlists then
@@ -592,7 +606,7 @@ function awesompd:menu_servers()
    if self.recreate_servers then
       local new_menu = {}
       for i = 1, #self.servers do
-	 table.insert(new_menu, {"Server: " .. self.servers[i].server .. 
+	 table.insert(new_menu, {"Server: " .. self.servers[i].server ..
 				 ", port: " .. self.servers[i].port,
 			      function() self:change_server(i) end,
                               self:menu_item_radio(i == self.current_server)})
@@ -604,17 +618,17 @@ end
 
 -- Returns the options menu. Menu works like checkboxes for it's elements.
 function awesompd:menu_options()
-   if self.recreate_options then 
-      local new_menu = { { "Repeat", self:menu_toggle_repeat(), 
+   if self.recreate_options then
+      local new_menu = { { "Repeat", self:menu_toggle_repeat(),
                            self:menu_item_toggle(self.state_repeat == "on")},
-                         { "Random", self:menu_toggle_random(), 
+                         { "Random", self:menu_toggle_random(),
                            self:menu_item_toggle(self.state_random == "on")},
-                         { "Single", self:menu_toggle_single(), 
+                         { "Single", self:menu_toggle_single(),
                            self:menu_item_toggle(self.state_single == "on")},
-                         { "Consume", self:menu_toggle_consume(), 
+                         { "Consume", self:menu_toggle_consume(),
                            self:menu_item_toggle(self.state_consume == "on")} }
       self.options_menu = new_menu
-      self.recreate_options = false      
+      self.recreate_options = false
    end
    return self.options_menu
 end
@@ -648,7 +662,7 @@ function awesompd:menu_toggle_consume()
 end
 
 function awesompd:menu_jamendo_top()
-   return 
+   return
    function ()
       local track_table = jamendo.return_track_table()
       if not track_table then
@@ -674,7 +688,7 @@ function awesompd:menu_jamendo_format()
                    end
          end
 
-      local iscurr = 
+      local iscurr =
          function(f)
             return jamendo.current_request_table.params.streamencoding.value
                == f.value
@@ -686,7 +700,7 @@ function awesompd:menu_jamendo_format()
                                   self:menu_item_radio(iscurr(format))})
       end
       self.recreate_jamendo_formats = false
-      self.jamendo_formats_menu = { 
+      self.jamendo_formats_menu = {
          "Format: " ..
             jamendo.current_request_table.params.streamencoding.short_display,
          new_menu }
@@ -695,16 +709,16 @@ function awesompd:menu_jamendo_format()
 end
 
 function awesompd:menu_jamendo_browse()
-   if self.recreate_jamendo_browse and self.browser 
+   if self.recreate_jamendo_browse and self.browser
       and self.current_track.unique_name then
       local track = jamendo.get_track_by_link(self.current_track.unique_name)
       local new_menu
       if track then
-         local artist_link = 
+         local artist_link =
             "http://www.jamendo.com/artist/" .. track.artist_link_name
          local album_link =
             "http://www.jamendo.com/album/" .. track.album_id
-         new_menu = { { "Artist's page" , 
+         new_menu = { { "Artist's page" ,
                         self:command_open_in_browser(artist_link) },
                       { "Album's page" ,
                         self:command_open_in_browser(album_link) } }
@@ -727,7 +741,7 @@ function awesompd:menu_jamendo_order()
                    end
          end
 
-      local iscurr = 
+      local iscurr =
          function(o)
             return jamendo.current_request_table.params.order.value
                == o.value
@@ -739,7 +753,7 @@ function awesompd:menu_jamendo_order()
                                   self:menu_item_radio(iscurr(order))})
       end
       self.recreate_jamendo_order = false
-      self.jamendo_order_menu = { 
+      self.jamendo_order_menu = {
          "Order: " ..
             jamendo.current_request_table.params.order.short_display,
          new_menu }
@@ -749,7 +763,7 @@ end
 
 function awesompd:menu_jamendo_search_by(what)
    return function()
-             local callback = 
+             local callback =
                 function(s)
                    local result = jamendo.search_by(what, s)
                    if result then
@@ -859,7 +873,7 @@ function awesompd:notify_track()
 end
 
 function awesompd:notify_state(state_changed)
-   state_array = { "Volume: " .. self.state_volume ,
+   state_array = { --"Volume: " .. self.state_volume ,
 		   "Repeat: " .. self.state_repeat ,
 		   "Random: " .. self.state_random ,
 		   "Single: " .. self.state_single ,
@@ -874,7 +888,7 @@ function awesompd:notify_state(state_changed)
 end
 
 function awesompd:wrap_output(text)
-   return format('<span font="%s" color="%s" background="%s">%s%s%s</span>',
+   return format('<span font="%s" foreground="%s" background="%s">%s%s%s</span>',
                  self.font, self.font_color, self.background,
                  (text == "" and "" or self.ldecorator), awesompd.protect_string(text),
                  (text == "" and "" or self.rdecorator))
@@ -883,37 +897,16 @@ end
 -- This function actually sets the text on the widget.
 function awesompd:set_text(text)
    self.text_widget:set_markup(self:wrap_output(text))
+   --self.text_widget:set_markup(text)
 end
 
 function awesompd.find_pattern(text, pattern, start)
    return utf8.sub(text, string.find(text, pattern, start))
 end
 
--- Scroll the given text by the current number of symbols.
-function awesompd:scroll_text(text)
-   local result = text
-   if self.scrolling then
-      if self.output_size < utf8.len(text) then
-         text = text .. " - "
-         if self.scroll_pos + self.output_size - 1 > utf8.len(text) then
-            result = utf8.sub(text, self.scroll_pos)
-            result = result .. utf8.sub(text, 1, self.scroll_pos + self.output_size - 1 - utf8.len(text))
-            self.scroll_pos = self.scroll_pos + 1
-            if self.scroll_pos > utf8.len(text) then
-               self.scroll_pos = 1
-            end
-         else
-            result = utf8.sub(text, self.scroll_pos, self.scroll_pos + self.output_size - 1)
-            self.scroll_pos = self.scroll_pos + 1
-         end
-      end
-   end
-   return result
-end
-
 -- This function is called every second.
 function awesompd:update_widget()
-   self:set_text(self:scroll_text(self.text))
+   self:set_text(self.text)
    self:check_notify()
 end
 
@@ -1027,8 +1020,8 @@ function awesompd:update_track(file)
             -- the cover for the next track.
             if self.list_array and self.current_number ~= #self.list_array then
                -- Get the link (in case it is Jamendo stream) to the next track
-               local next_track = 
-                  self:command_read('playlist -f "%file%" | head -' .. 
+               local next_track =
+                  self:command_read('playlist -f "%file%" | head -' ..
                                     self.current_number + 1 .. ' | tail -1', "*line")
                jamendo.try_get_cover_async(next_track)
             end
@@ -1062,8 +1055,8 @@ function awesompd:smart_update()
       local dur = to_seconds(self.track_duration)
       local rem = (dur - pos) + 1
       if (rem < self.update_interval) then
-	 -- Little time remaining, lets update when it runs out 
-	 local smart_timer = timer({ timeout = rem })
+	 -- Little time remaining, lets update when it runs out
+	 local smart_timer = gears.timer({ timeout = rem })
 	 smart_timer:connect_signal("timeout", function()
 	    smart_timer:stop()
 	    self:update_track()
@@ -1125,7 +1118,7 @@ function awesompd:init_inputbox()
    local height = 30
    local border_color = beautiful.bg_focus or '#535d6c'
    local margin = 4
-   local wbox = wibox({ name = "awmpd_ibox", height = height , width = width, 
+   local wbox = wibox({ name = "awmpd_ibox", height = height , width = width,
                         border_color = border_color, border_width = 1 })
    local ws = screen[mouse.screen].workarea
 
@@ -1169,7 +1162,7 @@ function awesompd:display_inputbox(title_text, prompt_text, hook)
                             self.inputbox.wibox.visible = false
                          end
    self.inputbox.title:set_markup("<b>" .. title_text .. "</b>")
-   awful.prompt.run( { prompt = " " .. prompt_text .. ": ", bg_cursor = "#222222" }, 
+   awful.prompt.run( { prompt = " " .. prompt_text .. ": ", bg_cursor = "#222222" },
                      self.inputbox.prompt.widget,
                      exe_callback, nil, nil, nil, done_callback, nil, nil)
    self.inputbox.wibox.visible = true
@@ -1203,7 +1196,7 @@ function awesompd:try_get_local_cover(current_file)
          self.pread('cat ' .. self.mpd_config .. ' | grep -v ^"#" | grep music_directory', "*line"),
          'music_directory%s+"(.+)"')
       music_folder = music_folder .. "/"
-      
+
       -- If the music_folder is specified with ~ at the beginning,
       -- replace it with user home directory
       if string.sub(music_folder, 1, 1) == "~" then
@@ -1221,30 +1214,30 @@ function awesompd:try_get_local_cover(current_file)
       end
 
       local folder = music_folder .. current_file_folder
-      
+
       -- Get all images in the folder. Also escape occasional single
       -- quotes in folder name.
-      local request = format("ls '%s' | grep -P '\\.jpg|\\.png|\\.gif|\\.jpeg'",
+      local request = format("ls '%s' | egrep -e '\\.jpg|\\.png|\\.gif|\\.jpeg'",
                              string.gsub(folder, "'", "'\\''"))
 
       local covers = self.pread(request, "*all")
       local covers_table = self.split(covers)
-      
+
       if covers_table.n > 0 then
          result = folder .. covers_table[1]
          if covers_table.n > 1 then
             -- Searching for front cover with grep because Lua regular
             -- expressions suck:[
-            local front_cover = 
-               self.pread('echo "' .. covers .. 
-                          '" | grep -P -i "cover|front|folder|albumart" | head -n 1', "*line")
+            local front_cover =
+               self.pread('echo "' .. covers ..
+                          '" | grep -i -e "cover|front|folder|albumart" | head -n 1', "*line")
             if front_cover then
                result = folder .. front_cover
             end
          end
       end
       return result
-   end   
+   end
 end
 
 -- /// Deprecated, left for some backward compatibility in
