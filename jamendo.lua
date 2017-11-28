@@ -70,7 +70,7 @@ jamendo.ALL_ORDERS = { ORDER_RELEVANCE, ORDER_RANDOM, ORDER_RATINGDAILY,
                        ORDER_RATINGWEEKLY, ORDER_RATINGTOTAL }
 
 jamendo.current_request_table = { unit = "track",
-                                  fields = {"id", "artist_url", "artist_name", "name", 
+                                  fields = {"id", "artist_url", "artist_name", "name",
                                             "stream", "album_image", "album_name" },
                                   joins = { "track_album", "album_artist" },
                                   params = { streamencoding = jamendo.FORMAT_MP3,
@@ -92,11 +92,11 @@ local search_template = { fields = { "id", "name" },
 -- Returns default stream number for MP3 format. Requests API for it
 -- not more often than every hour.
 local function get_default_mp3_stream()
-   if not default_mp3_stream or 
+   if not default_mp3_stream or
       (os.time() - default_mp3_stream.last_checked) > 3600 then
-      local trygetlink = 
-         jamendo.perform_request("echo $(curl -w %{redirect_url} " .. 
-                                 "'http://api.jamendo.com/get2/stream/track/redirect/" .. 
+      local trygetlink =
+         jamendo.perform_request("echo $(curl -w %{redirect_url} " ..
+                                 "'http://api.jamendo.com/get2/stream/track/redirect/" ..
                                  "?streamencoding="..jamendo.FORMAT_MP3.value.."&id=729304')")
          local _, _, prefix = string.find(trygetlink, "stream(%d+)%.jamendo%.com")
          default_mp3_stream = { id = prefix, last_checked = os.time() }
@@ -159,18 +159,18 @@ function jamendo.return_track_table(request_table)
          -- Some songs don't have Ogg stream, use MP3 instead
          parse_table[i].stream = get_link_by_id(parse_table[i].id)
       end
-      _, _, parse_table[i].artist_link_name = 
+      _, _, parse_table[i].artist_link_name =
          string.find(parse_table[i].artist_url, "\\/artist\\/(.+)")
       -- Remove Jamendo escape slashes
       parse_table[i].artist_name =
          string.gsub(parse_table[i].artist_name, "\\/", "/")
       parse_table[i].name = string.gsub(parse_table[i].name, "\\/", "/")
 
-      parse_table[i].display_name = 
+      parse_table[i].display_name =
          parse_table[i].artist_name .. " - " .. parse_table[i].name
       -- Do Jamendo a favor, extract album_id for the track yourself
       -- from album_image link :)
-      local _, _, album_id = 
+      local _, _, album_id =
          string.find(parse_table[i].album_image, "\\/(%d+)\\/covers")
       parse_table[i].album_id = album_id or 0
       -- Save fetched tracks for further caching
@@ -189,11 +189,11 @@ function jamendo.form_request(request_table)
    local curl_str = "curl -A 'Mozilla/4.0' -fsm 5 \"%s\""
    local url = "http://api.jamendo.com/get2/%s/%s/json/%s/?%s"
    request_table = request_table or jamendo.current_request_table
-   
+
    local fields = request_table.fields or jamendo.current_request_table.fields
    local joins = request_table.joins or jamendo.current_request_table.joins
    local unit = request_table.unit or jamendo.current_request_table.unit
-   
+
    -- Form fields string (like field1+field2+fieldN)
    local f_string = str_interpose(fields, "+")
    -- Form joins string
@@ -202,7 +202,7 @@ function jamendo.form_request(request_table)
    local params = {}
    -- If parameters where supplied in request_table, add them to the
    -- parameters in current_request_table.
-   if request_table.params and 
+   if request_table.params and
       request_table.params ~= jamendo.current_request_table.params then
       -- First fill params with current_request_table parameters
       for k, v in pairs(jamendo.current_request_table.params) do
@@ -300,7 +300,7 @@ end
 -- them into symbols so we need to do it ourselves.
 function jamendo.utf8_codes_to_symbols (s)
    local hexnums = "[%dabcdefABCDEF]"
-   local pattern = string.format("\\u(%s%s%s%s?)", 
+   local pattern = string.format("\\u(%s%s%s%s?)",
                                  hexnums, hexnums, hexnums, hexnums)
    local decode = function(code)
                      code = tonumber(code, 16)
@@ -345,9 +345,9 @@ local function retrieve_cache()
    local track = {}
    if bus then
       local header = bus:read("*line")
-      if header == cache_header then 
+      if header == cache_header then
          for l in bus:lines() do
-            local _, _, id, artist_link_name, album_name, album_id, track_name = 
+            local _, _, id, artist_link_name, album_name, album_id, track_name =
                string.find(l,"(%d+)-([^-]+)-([^-]+)-(%d+)-(.+)")
             track = {}
             track.id = id
@@ -357,7 +357,7 @@ local function retrieve_cache()
             track.display_name = track_name
             jamendo_list[id] = track
          end
-      else 
+      else
          -- We encountered an outdated version of the cache
          -- file. Let's just remove it.
          awful.util.spawn("rm -f " .. cache_file)
@@ -371,7 +371,7 @@ function jamendo.save_cache()
    local bus = io.open(cache_file, "w")
    bus:write(cache_header .. "\n")
    for id,track in pairs(jamendo_list) do
-      bus:write(string.format("%s-%s-%s-%s-%s\n", id, 
+      bus:write(string.format("%s-%s-%s-%s-%s\n", id,
                               string.gsub(track.artist_link_name, '-', '\\_'),
                               string.gsub(track.album_name, '-', '\\_'),
                               track.album_id, track.display_name))
@@ -395,23 +395,23 @@ function jamendo.fetch_album_cover_request(track_id)
    end
    local file_path = album_covers_folder .. album_id .. ".jpg"
 
-   if not file_exists(file_path) then -- We need to download it  
+   if not file_exists(file_path) then -- We need to download it
       -- First check if cache directory exists
       f = io.popen('test -d ' .. album_covers_folder .. ' && echo t')
       if f:read("*line") ~= 't' then
          awful.util.spawn("mkdir " .. album_covers_folder)
       end
       f:close()
-      
+
       if not track.album_image then      -- Wow! We have album_id, but
          local a_id = tostring(album_id) --don't have album_image. Well,
          local prefix =                  --it happens.
             string.sub(a_id, 1, #a_id - 3)
-         track.album_image = 
+         track.album_image =
             string.format("http://imgjam.com/albums/s%s/%s/covers/1.100.jpg",
                           prefix == "" and 0 or prefix, a_id)
       end
-      
+
       return file_path, string.format("wget %s -O %s 2> /dev/null",
                                       track.album_image, file_path)
    else -- Cover already downloaded, return its filename and nil
@@ -473,7 +473,7 @@ function jamendo.search_by(what, s)
    local resp = jamendo.perform_request(jamendo.form_request(req))
    if resp then
       local search_res = jamendo.parse_json(resp)[1]
-      
+
       if search_res then
          -- Now when we got the search result, find tracks filtered by
          -- this result.
